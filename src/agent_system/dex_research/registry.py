@@ -8,11 +8,14 @@ from typing import Any
 from .models import StablecoinEntry
 
 
+REPOSITORY_METIS_REGISTRY = (
+    Path.cwd() / "config" / "dex_research" / "stablecoins_metis.json"
+)
+PACKAGED_METIS_REGISTRY = Path(__file__).resolve().parent / "data" / "stablecoins_metis.json"
 DEFAULT_METIS_REGISTRY = (
-    Path(__file__).resolve().parents[3]
-    / "config"
-    / "dex_research"
-    / "stablecoins_metis.json"
+    REPOSITORY_METIS_REGISTRY
+    if REPOSITORY_METIS_REGISTRY.is_file()
+    else PACKAGED_METIS_REGISTRY
 )
 
 

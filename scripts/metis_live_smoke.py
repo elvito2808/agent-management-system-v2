@@ -91,8 +91,8 @@ def main() -> int:
                                 "explorer_url": deployment.explorer_factory_url})
         except Exception as exc:
             live_checks.append({"check": "factory_bytecode", "dex_id": deployment.dex_id,
-                                "address": deployment.factory_address, "passed": False,
-                                "error": str(exc)})
+                                "address": deployment.factory_address, "passed": None,
+                                "status": "insufficient_data", "error": str(exc)})
 
         if deployment.router_address:
             try:
@@ -111,7 +111,7 @@ def main() -> int:
             except Exception as exc:
                 live_checks.append({"check": "router_factory_match", "dex_id": deployment.dex_id,
                                     "router_address": deployment.router_address,
-                                    "passed": False, "error": str(exc)})
+                                    "passed": None, "status": "insufficient_data", "error": str(exc)})
         else:
             live_checks.append({"check": "router_factory_match", "dex_id": deployment.dex_id,
                                 "passed": None, "status": "unknown_no_reliable_router_address"})
@@ -139,7 +139,8 @@ def main() -> int:
         except Exception as exc:
             pair_checks[item.pool.pool_address.lower()] = {
                 "dex_id": deployment.dex_id, "factory_address": deployment.factory_address,
-                "passed": False, "error": f"{type(exc).__name__}: {exc}"}
+                "passed": None, "status": "insufficient_data",
+                "error": f"{type(exc).__name__}: {exc}"}
 
     report = json.loads(render_json_report(results, deployments, generated_at_utc=now))
     report["input_token"] = {
@@ -163,14 +164,19 @@ def main() -> int:
             record["router_status"] = "live_verified"
         elif router_check:
             record["router_status"] = "live_verification_failed"
-    report["dex_coverage"] = [
-        {
-            "dex_id": deployment.dex_id,
-            "status": ("data_found" if any(item.pool.dex_id.lower() == deployment.dex_id.lower() for item in results) else "insufficient_data"),
-            "message": (None if any(item.pool.dex_id.lower() == deployment.dex_id.lower() for item in results) else "اطلاعات کافی برای این DEX پیدا نشد؛ ممکن است API، شبکه یا خود DEX پاسخ نداده باشد، یا استخر منطبق پیدا نشده باشد."),
-        }
-        for deployment in deployments
-    ]
+    report["dex_coverage"] = []
+    for deployment in deployments:
+        dex_results = [item for item in results if item.pool.dex_id.lower() == deployment.dex_id.lower()]
+        if not dex_results:
+            status = "insufficient_data"
+            message = "اطلاعات کافی برای این DEX پیدا نشد؛ ممکن است API، شبکه یا خود DEX پاسخ نداده باشد، یا استخر منطبق پیدا نشده باشد."
+        elif any(not item.verified for item in dex_results):
+            status = "partial_data"
+            message = "استخر پیدا شد، اما بررسی زنجیره‌ای برای بخشی از اطلاعات کامل نشد؛ جزئیات خطا در گزارش آمده است."
+        else:
+            status = "data_found"
+            message = None
+        report["dex_coverage"].append({"dex_id": deployment.dex_id, "status": status, "message": message})
     report["discovery_error"] = discovery_error
     report["note"] = ("Live checks use read-only JSON-RPC calls. Liquidity and 24h volume are "
                       "third-party indexer values. No transaction is submitted.")
@@ -190,7 +196,7 @@ def main() -> int:
     markdown += "\n## Live deployment checks\n\n| Check | DEX | Address | Result | Detail |\n|---|---|---|---|---|\n"
     for check in live_checks:
         status = "PASS" if check.get("passed") is True else (
-            "UNKNOWN" if check.get("passed") is None else "FAIL")
+            "UNKNOWN" if check.get("passed") is None or check.get("error") else "FAIL")
         detail = check.get("error") or check.get("status") or ", ".join(check.get("checks", [])) or ""
         address = check.get("address") or check.get("router_address") or "—"
         detail = str(detail).replace("|", "\\|")
@@ -200,7 +206,7 @@ def main() -> int:
         for address, check in pair_checks.items():
             detail = check.get("error") or ", ".join(check.get("checks", [])) or ", ".join(check.get("errors", []))
             markdown += (f"- {check['dex_id']} pool {address}: "
-                         f"{'PASS' if check.get('passed') else 'FAIL'}; "
+                         f"{'PASS' if check.get('passed') is True else ('UNKNOWN' if check.get('passed') is None or check.get('error') else 'FAIL')}; "
                          f"factory {check['factory_address']}; "
                          f"reported pair {check.get('reported_pair_address', 'unknown')}; details {detail}\n")
     else:

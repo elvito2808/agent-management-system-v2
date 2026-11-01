@@ -47,3 +47,59 @@ def discover_stablecoin_pools(
         key=lambda pool: pool.liquidity_usd if pool.liquidity_usd is not None else 0,
         reverse=True,
     )
+
+
+from dataclasses import dataclass
+from .verifier import (
+    METIS_RPC_URL,
+    OnChainPoolVerification,
+    OnChainVerificationError,
+    verify_v2_pool_onchain,
+)
+
+
+@dataclass(frozen=True)
+class VerifiedPoolResult:
+    """Discovery candidate plus the result of an on-chain verification attempt."""
+    pool: PoolCandidate
+    verification: OnChainPoolVerification | None
+    error: str | None = None
+
+    @property
+    def verified(self) -> bool:
+        return self.verification is not None and self.verification.verified and self.error is None
+
+
+def discover_and_verify_stablecoin_pools(
+    token_address: str,
+    *,
+    rpc_url: str = METIS_RPC_URL,
+    registry: Iterable[StablecoinEntry] | None = None,
+    registry_path: str | Path | None = None,
+    dex_ids: Iterable[str] = DEFAULT_METIS_DEX_IDS,
+    require_positive_liquidity: bool = True,
+    fetcher: Callable[..., list[PoolCandidate]] = fetch_token_pairs,
+    verifier: Callable[..., OnChainPoolVerification] = verify_v2_pool_onchain,
+) -> list[VerifiedPoolResult]:
+    """Discover stablecoin pools, then check each candidate against the Metis RPC.
+
+    RPC failures are returned per pool as error text so one unavailable pool does
+    not hide the other results. Only a result whose verification.verified is True
+    should be described as on-chain verified.
+    """
+    candidates = discover_stablecoin_pools(
+        token_address,
+        registry=registry,
+        registry_path=registry_path,
+        dex_ids=dex_ids,
+        require_positive_liquidity=require_positive_liquidity,
+        fetcher=fetcher,
+    )
+    results: list[VerifiedPoolResult] = []
+    for pool in candidates:
+        try:
+            verification = verifier(pool, rpc_url=rpc_url)
+            results.append(VerifiedPoolResult(pool=pool, verification=verification))
+        except OnChainVerificationError as exc:
+            results.append(VerifiedPoolResult(pool=pool, verification=None, error=str(exc)))
+    return results

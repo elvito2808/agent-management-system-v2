@@ -187,7 +187,7 @@ class StellarExpertProviderTests(unittest.TestCase):
         provider = StellarExpertProvider(fetch_json=lambda _url: payload, max_pages=1, page_size=200)
         _, pools = provider.search("XLM")
         self.assertEqual(len(pools), 1)
-        self.assertEqual(pools[0]["liquidity_usd"], Decimal("1234.567"))
+        self.assertEqual(pools[0]["liquidity_usd"], Decimal("1234.56789"))
         self.assertEqual(pools[0]["volume_24h_usd"], Decimal("4.56789"))
 
 if __name__ == "__main__":

@@ -17,7 +17,15 @@ def normalize_address(address: str | None) -> str | None:
     value = address.strip()
     if not value:
         return None
-    return value.lower()
+    lowered = value.lower()
+    # Some network documentation omits leading zeroes in predeploy addresses.
+    # EVM address values are 20 bytes, so normalize short 0x-prefixed hex forms
+    # to the same 40-hex-digit representation used by ABI return values.
+    if lowered.startswith("0x"):
+        digits = lowered[2:]
+        if digits and len(digits) <= 40 and all(ch in "0123456789abcdef" for ch in digits):
+            return "0x" + digits.rjust(40, "0")
+    return lowered
 
 
 @dataclass(frozen=True)

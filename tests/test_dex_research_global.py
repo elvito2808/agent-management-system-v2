@@ -169,5 +169,26 @@ class StellarExpertProviderTests(unittest.TestCase):
 
 
 
+
+    def test_stellar_expert_fixed_point_tvl_and_volume_are_converted(self):
+        payload = {
+            "_embedded": {"records": [{
+                "id": "pool-fixed-point",
+                "assets": [
+                    {"asset": "XLM", "name": "XLM"},
+                    {"asset": "USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN-1",
+                     "code": "USDC", "name": "USD Coin"}
+                ],
+                "total_value_locked": 12345678900,
+                "volume_value": {"1d": 45678900},
+                "paging_token": 10
+            }]}
+        }
+        provider = StellarExpertProvider(fetch_json=lambda _url: payload, max_pages=1, page_size=200)
+        _, pools = provider.search("XLM")
+        self.assertEqual(len(pools), 1)
+        self.assertEqual(pools[0]["liquidity_usd"], Decimal("1234.567"))
+        self.assertEqual(pools[0]["volume_24h_usd"], Decimal("4.56789"))
+
 if __name__ == "__main__":
     unittest.main()

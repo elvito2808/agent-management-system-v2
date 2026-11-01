@@ -2,6 +2,16 @@ name: Metis live DEX smoke test
 
 on:
   workflow_dispatch:
+    inputs:
+      token_address:
+        description: "Token contract address on Metis Andromeda (0x...)"
+        required: true
+        type: string
+      token_symbol:
+        description: "Token symbol for report heading/filename (optional)"
+        required: false
+        default: "TOKEN"
+        type: string
   pull_request:
     branches: [main]
   push:
@@ -24,12 +34,14 @@ jobs:
       - name: Run read-only live Metis RPC and token-pool checks
         env:
           PYTHONPATH: src
+          TOKEN_ADDRESS: ${{ inputs.token_address || '0xDeadDeAddeAddEAddeadDEaDDEaDDeaDDeAD0000' }}
+          TOKEN_SYMBOL: ${{ inputs.token_symbol || 'TOKEN' }}
         run: python scripts/metis_live_smoke.py
       - name: Upload JSON and Markdown reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: metis-live-smoke-report
-          path: artifacts/metis-live-smoke-report.*
+          path: artifacts/dex-report-*.*
           if-no-files-found: warn
           retention-days: 14

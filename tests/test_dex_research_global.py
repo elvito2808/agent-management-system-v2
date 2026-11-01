@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 from decimal import Decimal
 
-from agent_system.dex_research.global_service import research_token, render_markdown
+from agent_system.dex_research.global_service import research_token, render_markdown\nfrom agent_system.dex_research.stablecoin_resolver import classify_pool
 
 
 class FakeProvider:
@@ -79,6 +79,23 @@ class GlobalResearchTests(unittest.TestCase):
         self.assertIn("indexed_only", markdown)
         self.assertIn("Coverage and limitations", markdown)
         self.assertIn("not independently verified on-chain", markdown)
+
+    def test_stablecoin_match_requires_network_and_exact_address(self):
+        status, symbol, evidence = classify_pool(
+            "ethereum",
+            {"asset_id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"},
+            {"asset_id": "0xother"},
+        )
+        self.assertEqual(status, "matched_registry")
+        self.assertEqual(symbol, "USDC")
+        self.assertIn("etherscan.io", evidence)
+
+        spoofed, _, _ = classify_pool(
+            "base",
+            {"asset_id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"},
+            {"asset_id": "0xother"},
+        )
+        self.assertEqual(spoofed, "unclassified")
 
     def test_empty_query_is_rejected(self):
         with self.assertRaises(ValueError):

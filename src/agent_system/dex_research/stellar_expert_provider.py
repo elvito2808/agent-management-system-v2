@@ -67,6 +67,22 @@ def _first_decimal(record: dict[str, Any], keys: tuple[str, ...]):
     return None
 
 
+def _fixed_point_usd(value: Any):
+    """Convert StellarExpert's 10^-7 fixed-point value fields to USD units."""
+    parsed = _decimal(value)
+    return parsed / 10_000_000 if parsed is not None else None
+
+
+def _volume_24h_usd(record: dict[str, Any]):
+    direct = _first_decimal(record, ("volume_24h_usd", "volume24h_usd", "volume_24h"))
+    if direct is not None:
+        return direct
+    volume_value = record.get("volume_value")
+    if isinstance(volume_value, dict):
+        return _fixed_point_usd(volume_value.get("1d"))
+    return None
+
+
 class StellarExpertProvider:
     """Scan a bounded number of StellarExpert's public liquidity-pool pages."""
 
@@ -126,9 +142,13 @@ class StellarExpertProvider:
                     continue
                 pool_id = record.get("id") or record.get("pool_id") or record.get("address")
                 pool_url = f"{EXPLORER_URL}/{pool_id}" if pool_id else EXPLORER_URL
-                # Only fields explicitly denominated in USD are treated as USD.
+                # StellarExpert's explorer uses fixed-point 10^-7 values for the
+                # USD-valued TVL/volume fields. Prefer explicitly named USD fields
+                # when present; otherwise normalize its documented display fields.
                 liquidity_usd = _first_decimal(record, ("total_value_locked_usd", "tvl_usd", "liquidity_usd"))
-                volume_24h_usd = _first_decimal(record, ("volume_24h_usd", "volume24h_usd", "volume_24h"))
+                if liquidity_usd is None:
+                    liquidity_usd = _fixed_point_usd(record.get("total_value_locked"))
+                volume_24h_usd = _volume_24h_usd(record)
                 dex_name = record.get("dex") or record.get("protocol") or "Stellar AMM"
                 pools.append({
                     "network": "stellar", "dex_name": str(dex_name),

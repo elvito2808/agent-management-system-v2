@@ -190,5 +190,17 @@ class StellarExpertProviderTests(unittest.TestCase):
         self.assertEqual(pools[0]["liquidity_usd"], Decimal("1234.56789"))
         self.assertEqual(pools[0]["volume_24h_usd"], Decimal("4.56789"))
 
+
+    def test_exact_address_filter_disambiguates_duplicate_symbol_identities(self):
+        identities = [
+            token("Native Stellar Lumens", "XLM", "stellar", "XLM"),
+            token("Issued XLM-like asset", "XLM", "stellar", "XLM-GISSUER-1"),
+        ]
+        report = research_token("XLM", providers=[FakeProvider(identities, [])],
+                                network_filter="stellar", address_filter="XLM")
+        self.assertEqual(len(report.identities), 1)
+        self.assertEqual(report.identities[0].asset_id, "XLM")
+        self.assertEqual(report.status, "insufficient_data")
+
 if __name__ == "__main__":
     unittest.main()

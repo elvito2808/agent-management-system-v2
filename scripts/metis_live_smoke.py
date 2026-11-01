@@ -142,6 +142,18 @@ def main() -> int:
     report["rpc_endpoint_attempts"] = rpc_attempts
     report["live_deployment_checks"] = live_checks
     report["factory_pair_checks"] = pair_checks
+    for record in report.get("results", []):
+        pool_address = str(record.get("pool_address", "")).lower()
+        record["factory_pair_verification"] = pair_checks.get(pool_address)
+        router_check = next((check for check in live_checks
+                             if check.get("check") == "router_factory_match"
+                             and check.get("dex_id") == record.get("dex_id")), None)
+        if not record.get("router_address"):
+            record["router_status"] = "unknown"
+        elif router_check and router_check.get("passed") is True:
+            record["router_status"] = "live_verified"
+        elif router_check:
+            record["router_status"] = "live_verification_failed"
     report["discovery_error"] = discovery_error
     report["note"] = ("Live checks use read-only JSON-RPC calls. Liquidity and 24h volume are "
                       "third-party indexer values. No transaction is submitted.")
@@ -177,7 +189,21 @@ def main() -> int:
     print("=== LIVE METIS DEX SMOKE TEST: JSON REPORT ===")
     print(json.dumps(report, indent=2, ensure_ascii=False))
     print(f"Artifacts: {json_path} ; {markdown_path}")
-    return 0
+
+    chain_ok = any(check.get("check") == "rpc_chain_id" and check.get("passed") is True
+                   for check in live_checks)
+    token_ok = any(check.get("check") == "metis_token_predeploy_bytecode"
+                   and check.get("passed") is True for check in live_checks)
+    factories_ok = all(check.get("passed") is True for check in live_checks
+                       if check.get("check") == "factory_bytecode")
+    known_routers_ok = all(check.get("passed") is True for check in live_checks
+                           if check.get("check") == "router_factory_match"
+                           and check.get("router_address"))
+    pools_ok = bool(results) and all(item.verified for item in results)
+    factory_pairs_ok = bool(pair_checks) and all(check.get("passed") is True
+                                                  for check in pair_checks.values())
+    return 0 if (chain_ok and token_ok and factories_ok and known_routers_ok
+                 and pools_ok and factory_pairs_ok and discovery_error is None) else 1
 
 if __name__ == "__main__":
     sys.exit(main())

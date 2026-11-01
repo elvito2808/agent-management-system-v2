@@ -98,6 +98,21 @@ class GlobalResearchTests(unittest.TestCase):
         )
         self.assertEqual(spoofed, "unclassified")
 
+
+    def test_duplicate_symbols_are_marked_ambiguous(self):
+        identities = [
+            token("Same Name", "DUP", "ethereum", "0xaaa"),
+            token("Same Name", "DUP", "base", "0xbbb"),
+        ]
+        pools = [
+            pool(network="ethereum", address="0xpool1"),
+            pool(network="base", address="0xpool2"),
+        ]
+        pools[1]["token0"] = token("Same Name", "DUP", "base", "0xbbb")
+        report = research_token("DUP", providers=[FakeProvider(identities, pools)])
+        self.assertEqual(report.status, "ambiguous_identity")
+        self.assertGreaterEqual(len(report.identities), 2)
+
     def test_empty_query_is_rejected(self):
         with self.assertRaises(ValueError):
             research_token("  ", providers=[])

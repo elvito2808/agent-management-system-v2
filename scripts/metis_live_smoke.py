@@ -72,6 +72,7 @@ def main() -> int:
                         "passed": selected_chain_id == EXPECTED_CHAIN_ID,
                         "attempts": rpc_attempts})
 
+    token_code: bool | None = None
     try:
         token_code = has_code(token_address)
         live_checks.append({"check": "token_contract_bytecode",
@@ -79,7 +80,7 @@ def main() -> int:
     except Exception as exc:
         token_code = False
         live_checks.append({"check": "token_contract_bytecode",
-                            "address": token_address, "passed": False, "error": str(exc)})
+                            "address": token_address, "passed": None, "error": str(exc)})
 
     for deployment in deployments:
         try:

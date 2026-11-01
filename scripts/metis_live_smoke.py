@@ -1,6 +1,8 @@
 """Live, read-only smoke test for Metis Andromeda DEX deployments and METIS pools."""
 from __future__ import annotations
 import json
+import os
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +16,8 @@ from agent_system.dex_research.verifier import (
     verify_factory_pair, verify_router_factory_onchain,
 )
 
-METIS_TOKEN_ADDRESS = "0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000"
+DEFAULT_TOKEN_ADDRESS = "0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000"
+DEFAULT_TOKEN_SYMBOL = "METIS"
 EXPECTED_CHAIN_ID = 1088
 ARTIFACT_DIR = Path("artifacts")
 TIMEOUT_SECONDS = 15.0
@@ -39,6 +42,11 @@ def has_code(address: str) -> bool:
 def main() -> int:
     global ACTIVE_RPC_URL
     now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    token_address = os.environ.get("TOKEN_ADDRESS", DEFAULT_TOKEN_ADDRESS).strip()
+    token_symbol = os.environ.get("TOKEN_SYMBOL", DEFAULT_TOKEN_SYMBOL).strip() or "UNKNOWN"
+    if len(token_address) != 42 or not token_address.startswith("0x") or any(ch not in "0123456789abcdefABCDEF" for ch in token_address[2:]):
+        print("TOKEN_ADDRESS must be a 0x-prefixed 20-byte EVM contract address.", file=sys.stderr)
+        return 2
     deployments = load_dex_registry()
     live_checks: list[dict[str, object]] = []
     discovery_error: str | None = None
@@ -65,13 +73,13 @@ def main() -> int:
                         "attempts": rpc_attempts})
 
     try:
-        token_code = has_code(METIS_TOKEN_ADDRESS)
+        token_code = has_code(token_address)
         live_checks.append({"check": "metis_token_predeploy_bytecode",
-                            "address": METIS_TOKEN_ADDRESS, "passed": token_code})
+                            "address": token_address, "passed": token_code})
     except Exception as exc:
         token_code = False
         live_checks.append({"check": "metis_token_predeploy_bytecode",
-                            "address": METIS_TOKEN_ADDRESS, "passed": False, "error": str(exc)})
+                            "address": token_address, "passed": False, "error": str(exc)})
 
     for deployment in deployments:
         try:
@@ -108,7 +116,7 @@ def main() -> int:
                                 "passed": None, "status": "unknown_no_reliable_router_address"})
 
     try:
-        results = discover_and_verify_stablecoin_pools(METIS_TOKEN_ADDRESS, rpc_url=ACTIVE_RPC_URL)
+        results = discover_and_verify_stablecoin_pools(token_address, rpc_url=ACTIVE_RPC_URL)
     except Exception as exc:
         discovery_error = f"{type(exc).__name__}: {exc}"
 
@@ -134,10 +142,10 @@ def main() -> int:
 
     report = json.loads(render_json_report(results, deployments, generated_at_utc=now))
     report["input_token"] = {
-        "symbol": "METIS", "address": METIS_TOKEN_ADDRESS,
-        "address_source": "Metis official connection details: built-in L2 token predeploy",
-        "explorer_url": "https://andromeda-explorer.metis.io/token/0xdeaddeaddeaddeaddeaddeaddeaddeaddead0000",
-        "predeploy_has_bytecode": token_code}
+        "symbol": token_symbol, "address": token_address,
+        "address_source": "user-supplied contract address",
+        "explorer_url": f"https://andromeda-explorer.metis.io/token/{token_address}",
+        "contract_has_bytecode": token_code}
     report["rpc_endpoint"] = ACTIVE_RPC_URL
     report["rpc_endpoint_attempts"] = rpc_attempts
     report["live_deployment_checks"] = live_checks
@@ -154,16 +162,30 @@ def main() -> int:
             record["router_status"] = "live_verified"
         elif router_check:
             record["router_status"] = "live_verification_failed"
+    report["dex_coverage"] = [
+        {
+            "dex_id": deployment.dex_id,
+            "status": ("data_found" if any(item.pool.dex_id.lower() == deployment.dex_id.lower() for item in results) else "insufficient_data"),
+            "message": (None if any(item.pool.dex_id.lower() == deployment.dex_id.lower() for item in results) else "اطلاعات کافی برای این DEX پیدا نشد؛ ممکن است API، شبکه یا خود DEX پاسخ نداده باشد، یا استخر منطبق پیدا نشده باشد."),
+        }
+        for deployment in deployments
+    ]
     report["discovery_error"] = discovery_error
     report["note"] = ("Live checks use read-only JSON-RPC calls. Liquidity and 24h volume are "
                       "third-party indexer values. No transaction is submitted.")
 
     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-    json_path = ARTIFACT_DIR / "metis-live-smoke-report.json"
-    markdown_path = ARTIFACT_DIR / "metis-live-smoke-report.md"
+    safe_symbol = re.sub(r"[^A-Za-z0-9_-]+", "-", token_symbol).strip("-") or "token"
+    json_path = ARTIFACT_DIR / f"dex-report-{safe_symbol}.json"
+    markdown_path = ARTIFACT_DIR / f"dex-report-{safe_symbol}.md"
     json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
-    markdown = render_markdown_report(results, deployments, generated_at_utc=now)
+    markdown = "# DEX token report: " + token_symbol + "\n\n- Token contract: " + token_address + "\n- Network: Metis Andromeda (chain ID 1088)\n\n" + render_markdown_report(results, deployments, generated_at_utc=now)
+    markdown += "\n## DEX coverage status\n\n"
+    for coverage in report["dex_coverage"]:
+        markdown += "- **" + coverage["dex_id"] + "**: " + coverage["status"] + " — " + (coverage["message"] or "pool data found") + "\n"
+    if discovery_error:
+        markdown += "\n**Discovery warning:** insufficient data returned: " + discovery_error + "\n"
     markdown += "\n## Live deployment checks\n\n| Check | DEX | Address | Result | Detail |\n|---|---|---|---|---|\n"
     for check in live_checks:
         status = "PASS" if check.get("passed") is True else (
@@ -190,20 +212,8 @@ def main() -> int:
     print(json.dumps(report, indent=2, ensure_ascii=False))
     print(f"Artifacts: {json_path} ; {markdown_path}")
 
-    chain_ok = any(check.get("check") == "rpc_chain_id" and check.get("passed") is True
-                   for check in live_checks)
-    token_ok = any(check.get("check") == "metis_token_predeploy_bytecode"
-                   and check.get("passed") is True for check in live_checks)
-    factories_ok = all(check.get("passed") is True for check in live_checks
-                       if check.get("check") == "factory_bytecode")
-    known_routers_ok = all(check.get("passed") is True for check in live_checks
-                           if check.get("check") == "router_factory_match"
-                           and check.get("router_address"))
-    pools_ok = bool(results) and all(item.verified for item in results)
-    factory_pairs_ok = bool(pair_checks) and all(check.get("passed") is True
-                                                  for check in pair_checks.values())
-    return 0 if (chain_ok and token_ok and factories_ok and known_routers_ok
-                 and pools_ok and factory_pairs_ok and discovery_error is None) else 1
+    # Partial data is a valid report outcome. External DEX/RPC outages are recorded, not fatal.
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())

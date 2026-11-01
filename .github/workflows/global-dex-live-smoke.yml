@@ -1,0 +1,49 @@
+name: Global DEX live smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/global-multichain-dex-research]
+
+jobs:
+  stellar-xlm-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Query XLM pools on native Stellar network
+        env:
+          PYTHONPATH: src
+        run: |
+          mkdir -p artifacts
+          python scripts/global_dex_research.py XLM --network stellar --address XLM --format json --output artifacts/xlm-stellar.json
+      - name: Require at least one XLM pool from the Stellar provider
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("artifacts/xlm-stellar.json").read_text(encoding="utf-8"))
+          pools = [
+              p for p in report.get("pools", [])
+              if p.get("network") == "stellar"
+              and any(
+                  (t.get("symbol") or "").upper() == "XLM" or t.get("asset_id") == "XLM"
+                  for t in (p.get("token0", {}), p.get("token1", {}))
+              )
+          ]
+          print(f"status={report.get('status')}; pools={len(pools)}; providers={report.get('providers_searched')}")
+          if not pools:
+              raise SystemExit("No native Stellar XLM pool was returned; inspect the JSON report and provider issues.")
+          PY
+      - name: Upload XLM report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xlm-stellar-live-report
+          path: artifacts/xlm-stellar.json
+          if-no-files-found: warn

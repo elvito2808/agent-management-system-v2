@@ -18,9 +18,16 @@ METIS_TOKEN_ADDRESS = "0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000"
 EXPECTED_CHAIN_ID = 1088
 ARTIFACT_DIR = Path("artifacts")
 TIMEOUT_SECONDS = 15.0
+RPC_CANDIDATES = (
+    METIS_RPC_URL,
+    "https://metis-rpc.publicnode.com",
+    "https://metis.drpc.org",
+    "https://metis-andromeda.rpc.thirdweb.com",
+)
+ACTIVE_RPC_URL = METIS_RPC_URL
 
 def rpc(method: str, params: list[object]) -> object:
-    return _rpc_call(METIS_RPC_URL, method, params,
+    return _rpc_call(ACTIVE_RPC_URL, method, params,
                      timeout_seconds=TIMEOUT_SECONDS, opener=urlopen)
 
 def has_code(address: str) -> bool:
@@ -30,19 +37,32 @@ def has_code(address: str) -> bool:
     return len(result) > 2 and any(char != "0" for char in result[2:])
 
 def main() -> int:
+    global ACTIVE_RPC_URL
     now = datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
     deployments = load_dex_registry()
     live_checks: list[dict[str, object]] = []
     discovery_error: str | None = None
     results = []
 
-    try:
-        chain_raw = rpc("eth_chainId", [])
-        chain_id = int(chain_raw, 16) if isinstance(chain_raw, str) else None
-        live_checks.append({"check": "rpc_chain_id", "expected": EXPECTED_CHAIN_ID,
-                            "actual": chain_id, "passed": chain_id == EXPECTED_CHAIN_ID})
-    except Exception as exc:
-        live_checks.append({"check": "rpc_chain_id", "passed": False, "error": str(exc)})
+    rpc_attempts: list[dict[str, object]] = []
+    selected_chain_id: int | None = None
+    for endpoint in RPC_CANDIDATES:
+        try:
+            chain_raw = _rpc_call(endpoint, "eth_chainId", [],
+                                  timeout_seconds=TIMEOUT_SECONDS, opener=urlopen)
+            actual = int(chain_raw, 16) if isinstance(chain_raw, str) else None
+            passed = actual == EXPECTED_CHAIN_ID
+            rpc_attempts.append({"endpoint": endpoint, "chain_id": actual, "passed": passed})
+            if passed:
+                ACTIVE_RPC_URL = endpoint
+                selected_chain_id = actual
+                break
+        except Exception as exc:
+            rpc_attempts.append({"endpoint": endpoint, "passed": False, "error": str(exc)})
+    live_checks.append({"check": "rpc_chain_id", "endpoint": ACTIVE_RPC_URL,
+                        "expected": EXPECTED_CHAIN_ID, "actual": selected_chain_id,
+                        "passed": selected_chain_id == EXPECTED_CHAIN_ID,
+                        "attempts": rpc_attempts})
 
     try:
         token_code = has_code(METIS_TOKEN_ADDRESS)
@@ -69,7 +89,7 @@ def main() -> int:
             try:
                 checked = verify_router_factory_onchain(
                     deployment.router_address, deployment.factory_address,
-                    rpc_url=METIS_RPC_URL, timeout_seconds=TIMEOUT_SECONDS)
+                    rpc_url=ACTIVE_RPC_URL, timeout_seconds=TIMEOUT_SECONDS)
                 live_checks.append({
                     "check": "router_factory_match", "dex_id": deployment.dex_id,
                     "router_address": deployment.router_address,
@@ -88,7 +108,7 @@ def main() -> int:
                                 "passed": None, "status": "unknown_no_reliable_router_address"})
 
     try:
-        results = discover_and_verify_stablecoin_pools(METIS_TOKEN_ADDRESS, rpc_url=METIS_RPC_URL)
+        results = discover_and_verify_stablecoin_pools(METIS_TOKEN_ADDRESS, rpc_url=ACTIVE_RPC_URL)
     except Exception as exc:
         discovery_error = f"{type(exc).__name__}: {exc}"
 
@@ -100,7 +120,7 @@ def main() -> int:
             continue
         try:
             checked = verify_factory_pair(item.pool, deployment.factory_address,
-                                           rpc_url=METIS_RPC_URL,
+                                           rpc_url=ACTIVE_RPC_URL,
                                            timeout_seconds=TIMEOUT_SECONDS)
             pair_checks[item.pool.pool_address.lower()] = {
                 "dex_id": deployment.dex_id, "factory_address": checked.factory_address,
@@ -118,7 +138,8 @@ def main() -> int:
         "address_source": "Metis official connection details: built-in L2 token predeploy",
         "explorer_url": "https://andromeda-explorer.metis.io/token/0xdeaddeaddeaddeaddeaddeaddeaddeaddead0000",
         "predeploy_has_bytecode": token_code}
-    report["rpc_endpoint"] = METIS_RPC_URL
+    report["rpc_endpoint"] = ACTIVE_RPC_URL
+    report["rpc_endpoint_attempts"] = rpc_attempts
     report["live_deployment_checks"] = live_checks
     report["factory_pair_checks"] = pair_checks
     report["discovery_error"] = discovery_error

@@ -61,3 +61,20 @@ For each candidate pool, return:
 - Missing fields and API errors are surfaced explicitly.
 - Unit tests do not need internet access.
 - No router or contract address is fabricated.
+
+
+## Implementation status (2026-11-01)
+
+Completed on `feature/dex-research-agent`:
+- Read-only DEX Screener client for token-address pair discovery using the documented `/token-pairs/v1/{chainId}/{tokenAddress}` endpoint.
+- Sourced Metis Andromeda registry entries for canonical-bridge m.USDC and m.USDT, with the official Metis technical migration guide recorded as the source.
+- Registry loader with input validation.
+- Offline unit tests for API parsing/error cases and exact-address stablecoin filtering.
+- GitHub Actions workflow intended to run the DEX research unit tests on pushes and pull requests.
+
+Still incomplete:
+- CI run has not yet been observed; confirm workflow execution and fix any failures before merging.
+- No direct RPC/on-chain verification of pool/token contracts yet.
+- No verified Netswap/Tethys Router registry yet; do not infer Router addresses from pool data.
+- No token-symbol-to-contract discovery; callers must currently provide the token contract address.
+- Registry is intentionally limited to canonical-bridge m.USDC and m.USDT, not all assets marketed as stablecoins on Metis.

@@ -1,0 +1,26 @@
+{
+  "network": "Metis Andromeda",
+  "chain_id": 1088,
+  "reviewed_at_utc": "2026-11-01T00:00:00Z",
+  "source_url": "https://www.metis.io/blog/technical-migration-guide-layerzero-v2-dvn-executor-on-metis-andromeda",
+  "tokens": [
+    {
+      "address": "0xEA32A96608495e54156Ae48931A7c20f0dcc1a21",
+      "symbol": "m.USDC",
+      "name": "Metis canonical-bridge USDC",
+      "source_note": "Listed in Appendix B as issued by the Metis canonical bridge."
+    },
+    {
+      "address": "0xbB06DCA3AE6887fAbF931640f67cab3e3a16F4dC",
+      "symbol": "m.USDT",
+      "name": "Metis canonical-bridge USDT",
+      "source_note": "Listed in Appendix B as issued by the Metis canonical bridge."
+    }
+  ],
+  "limitations": [
+    "This registry includes only the two canonical-bridge stablecoins documented by the cited source.",
+    "It is not a complete list of every stablecoin or bridged asset on Metis.",
+    "Symbols are descriptive; matching must use chain ID and contract address.",
+    "Addresses and token status should be rechecked against an explorer before production use."
+  ]
+}

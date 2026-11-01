@@ -16,7 +16,7 @@ class TokenIdentity:
     symbol: str | None
     network: str
     asset_id: str | None
-    token_type: str = "unknown"  # native, contract, wrapped, bridged, or unknown
+    token_type: str = "unknown"
     source: str = ""
     source_url: str = ""
 
@@ -40,6 +40,8 @@ class PoolCandidate:
     fetched_at_utc: str = ""
     verification_status: str = "indexed_only"
     stablecoin_status: str = "unclassified"
+    stablecoin_symbol: str | None = None
+    stablecoin_evidence_url: str | None = None
 
     @property
     def key(self) -> tuple[str, str, str]:

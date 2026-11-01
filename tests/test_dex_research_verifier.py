@@ -33,7 +33,7 @@ class FakeResponse:
 
 
 def abi_address(address):
-    return "0x" + ("0" * 24) + address[2:].lower()
+    return "0x" + ("0" * 24) + address[2:].lower().rjust(40, "0")
 
 
 def pool():

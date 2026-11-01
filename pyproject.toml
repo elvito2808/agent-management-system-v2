@@ -14,3 +14,6 @@ ams = "agent_system.interfaces.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+agent_system = ["dex_research/data/*.json"]

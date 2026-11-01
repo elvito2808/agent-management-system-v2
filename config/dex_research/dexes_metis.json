@@ -1,0 +1,35 @@
+{
+  "network": "Metis Andromeda",
+  "chain_id": 1088,
+  "reviewed_at_utc": "2026-11-01T00:00:00Z",
+  "dexes": [
+    {
+      "dex_id": "netswap",
+      "name": "Netswap",
+      "factory_address": "0x70f51d68D16e8f9e418441280342BD43AC9Dff9f",
+      "factory_source_url": "https://github.com/Netswap/exchange-contracts",
+      "router_address": "0x1E876cCe41B7b844FDe09E38Fa1cf00f213bFf56",
+      "router_source_url": "https://github.com/Netswap/exchange-contracts",
+      "explorer_factory_url": "https://andromeda-explorer.metis.io/address/0x70f51d68D16e8f9e418441280342BD43AC9Dff9f",
+      "explorer_router_url": "https://andromeda-explorer.metis.io/address/0x1E876cCe41B7b844FDe09E38Fa1cf00f213bFf56",
+      "confidence": "documented_in_protocol_source_and_explorer"
+    },
+    {
+      "dex_id": "tethys",
+      "name": "Tethys",
+      "factory_address": "0x2CdFB20205701FF01689461610C9F321D1d00F80",
+      "factory_source_url": "https://defisecurity.io/dist/files/tethys_finance_security_audit_report_1.0.pdf",
+      "router_address": null,
+      "router_source_url": null,
+      "explorer_factory_url": "https://andromeda-explorer.metis.io/address/0x2CdFB20205701FF01689461610C9F321D1d00F80",
+      "explorer_router_url": null,
+      "confidence": "factory_listed_in_audit_scope_router_not_verified"
+    }
+  ],
+  "limitations": [
+    "Netswap addresses are documented in the project's exchange-contracts repository; the explorer separately identifies the router and its factory constructor argument.",
+    "Tethys factory address is listed in the scope of a historical security audit report; it must be checked for current bytecode and factory-pair behavior before production reliance.",
+    "No Tethys router address is included because a reliable source for it has not been established.",
+    "Registry documentation is not a substitute for live RPC checks."
+  ]
+}

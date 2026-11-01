@@ -40,7 +40,7 @@ def pool(network="cardano", dex="ExampleSwap", address="pool-abc", liquidity="12
 
 class GlobalResearchTests(unittest.TestCase):
     def test_arbitrary_symbol_and_non_evm_identifier_are_supported(self):
-        identity = token("Any Token", "ANY", "cardano", "policy.asset")
+        identity = token("Any Token", "ANY", "cardano", "asset1")
         report = research_token("ANY", providers=[FakeProvider([identity], [pool()])])
         self.assertEqual(report.status, "data_found")
         self.assertEqual(report.pools[0].network, "cardano")
@@ -48,8 +48,9 @@ class GlobalResearchTests(unittest.TestCase):
         self.assertEqual(report.pools[0].verification_status, "indexed_only")
 
     def test_provider_failure_does_not_hide_other_provider_results(self):
-        good = FakeProvider([token("Any Token", "ANY", "base", "0xabc")],
-                            [pool(network="base", address="0xpool")])
+        matching_pool = pool(network="base", address="0xpool")
+        matching_pool["token0"] = token("Any Token", "ANY", "base", "0xabc")
+        good = FakeProvider([token("Any Token", "ANY", "base", "0xabc")], [matching_pool])
         bad = FakeProvider(error="simulated timeout")
         bad.name = "unavailable"
         report = research_token("ANY", providers=[bad, good])

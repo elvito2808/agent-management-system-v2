@@ -69,7 +69,9 @@ def research_token(
             for raw in raw_identities:
                 try:
                     identity = _identity(raw)
-                    if not network_filter or identity.network.casefold() == network_filter.casefold():
+                    if ((not network_filter or identity.network.casefold() == network_filter.casefold())
+                            and (_query_matches_token(requested, identity)
+                                 or (address_filter and address_filter.casefold() == (identity.asset_id or "").casefold()))):
                         identities.setdefault(identity.key, identity)
                 except (TypeError, ValueError, KeyError):
                     continue
@@ -81,10 +83,13 @@ def research_token(
                     token_addresses = {(pool.token0.asset_id or "").casefold(), (pool.token1.asset_id or "").casefold()}
                     if address_filter and address_filter.casefold() not in token_addresses:
                         continue
-                    if not (_query_matches_token(requested, pool.token0)
-                            or _query_matches_token(requested, pool.token1)
-                            or (address_filter and address_filter.casefold() in token_addresses)):
+                    matches0 = _query_matches_token(requested, pool.token0) or (address_filter and address_filter.casefold() == (pool.token0.asset_id or "").casefold())
+                    matches1 = _query_matches_token(requested, pool.token1) or (address_filter and address_filter.casefold() == (pool.token1.asset_id or "").casefold())
+                    if not (matches0 or matches1):
                         continue
+                    for candidate in (pool.token0, pool.token1):
+                        if _query_matches_token(requested, candidate) or (address_filter and address_filter.casefold() == (candidate.asset_id or "").casefold()):
+                            identities.setdefault(candidate.key, candidate)
                     status, stable_symbol, evidence_url = classify_pool(
                         pool.network,
                         {"asset_id": pool.token0.asset_id},
@@ -100,14 +105,18 @@ def research_token(
         except Exception as exc:
             issues.append(ProviderIssue(provider=provider.name, stage="search", message=f"{type(exc).__name__}: {exc}"))
 
-    status = "data_found" if pools else ("partial_data" if issues and identities else "insufficient_data")
-    if issues and pools:
-        status = "partial_data"
+    if len(identities) > 1 and not address_filter:
+        status = "ambiguous_identity"
+    elif pools:
+        status = "partial_data" if issues else "data_found"
+    else:
+        status = "partial_data" if issues and identities else "insufficient_data"
     networks = sorted({p.network for p in pools.values()}, key=str.casefold)
     dexes = sorted({p.dex_name for p in pools.values()}, key=str.casefold)
     notes = [
         "Pool and volume figures are third-party indexed metrics, not independently verified on-chain.",
         "Search endpoints may cap results; absence from these results is not proof that no pool exists.",
+        "When several matching token identities are returned, status is ambiguous_identity; compare network and asset ID before treating them as the same asset.",
         "Stablecoin status is matched only when both network alias and chain-specific asset identifier match the reviewed registry. Unmatched assets remain unclassified.",
         "The bundled stablecoin registry is a seed list, not an exhaustive catalogue; extend it using sourced, reviewed chain-specific identifiers.",
         "DEX Screener and GeckoTerminal are the configured sources; networks unsupported or omitted by them are coverage gaps.",

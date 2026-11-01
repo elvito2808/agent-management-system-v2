@@ -121,6 +121,38 @@ class GlobalResearchTests(unittest.TestCase):
             research_token("  ", providers=[])
 
 
+class GeckoTerminalProviderTests(unittest.TestCase):
+    def test_network_is_recovered_from_pool_id_when_relationship_is_missing(self):
+        payload = {
+            "data": [{
+                "id": "zilliqa-evm_0xpoolabc",
+                "attributes": {"address": "0xpoolabc", "reserve_in_usd": "11105.78",
+                               "volume_usd": {"h24": "42.50"}},
+                "relationships": {
+                    "base_token": {"data": {"id": "zilliqa-evm_0xtoken1"}},
+                    "quote_token": {"data": {"id": "zilliqa-evm_0xwzil"}},
+                    "dex": {"data": {"id": "zilliqa-evm_plunderswap"}}
+                }
+            }],
+            "included": [
+                {"id": "zilliqa-evm_0xtoken1", "attributes": {"address": "0xtoken1", "name": "Wrapped ZIL", "symbol": "WZIL"}},
+                {"id": "zilliqa-evm_0xwzil", "attributes": {"address": "0xwzil", "name": "USD Coin", "symbol": "USDC"}},
+                {"id": "zilliqa-evm_plunderswap", "attributes": {"name": "PlunderSwap"}}
+            ]
+        }
+        import agent_system.dex_research.global_providers as module
+        original = module._http_json
+        module._http_json = lambda _url: payload
+        try:
+            _, pools = GeckoTerminalProvider().search("WZIL", network_filter="zilliqa-evm")
+        finally:
+            module._http_json = original
+        self.assertEqual(len(pools), 1)
+        self.assertEqual(pools[0]["network"], "zilliqa-evm")
+        self.assertEqual(pools[0]["pool_url"], "https://www.geckoterminal.com/zilliqa-evm/pools/0xpoolabc")
+        self.assertEqual(pools[0]["token0"]["network"], "zilliqa-evm")
+
+
 class StellarExpertProviderTests(unittest.TestCase):
     def test_stellar_native_xlm_pool_and_stellar_usdc_identity_are_normalized(self):
         payload = {

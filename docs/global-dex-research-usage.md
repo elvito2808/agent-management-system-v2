@@ -12,7 +12,7 @@ Python 3.12 is the repository baseline.
 python -m pip install -c requirements.lock.txt -e .
 python scripts/global_dex_research.py LINK
 python scripts/global_dex_research.py LINK --format json --output reports/link.json
-python scripts/global_dex_research.py USDC --network ethereum
+python scripts/global_dex_research.py XLM --network stellar --address XLM\npython scripts/global_dex_research.py USDC --network ethereum
 python scripts/global_dex_research.py 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --address 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48 --format json
 python -m unittest discover -s tests -p "test_dex_research*.py" -v
 ```

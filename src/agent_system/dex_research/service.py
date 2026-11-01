@@ -102,5 +102,5 @@ def discover_and_verify_stablecoin_pools(
             results.append(VerifiedPoolResult(pool=pool, verification=verification))
         except Exception as exc:
             # A single pool/RPC outage becomes a partial result, not a fatal report error.
-            results.append(VerifiedPoolResult(pool=pool, verification=None, error=f"{type(exc).__name__}: {exc}"))
+            results.append(VerifiedPoolResult(pool=pool, verification=None, error=str(exc)))
     return results

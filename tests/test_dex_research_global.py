@@ -4,7 +4,8 @@ from __future__ import annotations
 import unittest
 from decimal import Decimal
 
-from agent_system.dex_research.global_service import research_token, render_markdown\nfrom agent_system.dex_research.stablecoin_resolver import classify_pool
+from agent_system.dex_research.global_service import research_token, render_markdown
+from agent_system.dex_research.stablecoin_resolver import classify_pool
 
 
 class FakeProvider:

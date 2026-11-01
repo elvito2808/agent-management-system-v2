@@ -8,6 +8,7 @@ import re
 
 from .global_models import PoolCandidate, ProviderIssue, ResearchReport, TokenIdentity
 from .global_providers import DexScreenerProvider, GeckoTerminalProvider, PoolProvider
+from .stellar_expert_provider import StellarExpertProvider
 from .stablecoin_resolver import classify_pool
 
 
@@ -55,7 +56,7 @@ def research_token(
     requested = query.strip()
     if not requested:
         raise ValueError("Token name or symbol must not be empty")
-    adapters = list(providers) if providers is not None else [DexScreenerProvider(), GeckoTerminalProvider()]
+    adapters = list(providers) if providers is not None else [DexScreenerProvider(), GeckoTerminalProvider(), StellarExpertProvider()]
     identities: dict[tuple[str, str], TokenIdentity] = {}
     pools: dict[tuple[str, str, str], PoolCandidate] = {}
     issues: list[ProviderIssue] = []
@@ -119,7 +120,7 @@ def research_token(
         "When several matching token identities are returned, status is ambiguous_identity; compare network and asset ID before treating them as the same asset.",
         "Stablecoin status is matched only when both network alias and chain-specific asset identifier match the reviewed registry. Unmatched assets remain unclassified.",
         "The bundled stablecoin registry is a seed list, not an exhaustive catalogue; extend it using sourced, reviewed chain-specific identifiers.",
-        "DEX Screener and GeckoTerminal are the configured sources; networks unsupported or omitted by them are coverage gaps.",
+        "DEX Screener, GeckoTerminal, and StellarExpert are configured. StellarExpert scans a bounded number of public Stellar pool pages; this is not exhaustive global or Stellar-wide coverage.",
     ]
     if not pools and issues:
         notes.append("No pool rows were returned and at least one provider failed; this is not evidence that the token has no liquidity.")

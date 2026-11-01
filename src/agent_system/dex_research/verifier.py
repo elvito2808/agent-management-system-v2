@@ -50,7 +50,11 @@ def _rpc_call(
     request = Request(
         rpc_url,
         data=request_body,
-        headers={"Content-Type": "application/json", "Accept": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "agent-management-system-v2/0.1 (read-only Metis DEX research)",
+        },
         method="POST",
     )
     try:

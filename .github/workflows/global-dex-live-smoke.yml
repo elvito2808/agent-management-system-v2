@@ -21,7 +21,7 @@ jobs:
           PYTHONPATH: src
         run: |
           mkdir -p artifacts
-          python scripts/global_dex_research.py XLM --network stellar --format json --output artifacts/xlm-stellar.json
+          python scripts/global_dex_research.py XLM --network stellar --address XLM --format json --output artifacts/xlm-stellar.json
       - name: Require at least one XLM pool from the Stellar provider
         run: |
           python - <<'PY'

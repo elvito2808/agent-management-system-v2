@@ -25,6 +25,7 @@ provider-specific.
 
 - **DEX Screener** global pair search.
 - **GeckoTerminal** global pool search.
+- **StellarExpert** native Stellar liquidity-pool index. It scans up to five pages of 200 records per request (maximum 1,000 indexed pools); results are bounded and not exhaustive. The adapter reports USD liquidity/volume only when the response explicitly supplies USD-denominated fields.
 - Name/symbol/address candidates, network, DEX, pool link, reported USD liquidity,
   24-hour volume, retrieval timestamp, provider provenance and source errors.
 - Markdown is the default; `--format json` emits a machine-readable report.
@@ -37,20 +38,17 @@ The seed registry at
 `src/agent_system/dex_research/data/stablecoins.global.json` matches both a
 network alias and the exact token contract address. The initial list covers
 selected USDC/USDT/DAI deployments on Ethereum, Base, Polygon, Arbitrum,
-Optimism and BNB Smart Chain. It is intentionally not presented as exhaustive.
+Optimism, BNB Smart Chain, and Stellar USDC (`USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN-1`). It is intentionally not presented as exhaustive.
 A matching entry includes a source URL. Ticker similarity alone never qualifies
 a token as a stablecoin. Unknown assets remain `unclassified`.
 
 Add registry entries only after checking the exact asset identifier and source;
 keep bridged/canonical versions separate. The current resolver is EVM-focused
-because the initial registry contains EVM addresses. Native and non-EVM asset
-identifiers are supported by the shared models and provider adapters, but need
-their own sourced registry entries for stablecoin classification.
+because the initial registry contains EVM addresses. Native and non-EVM asset identifiers are supported by the shared models and provider adapters. Stellar USDC is now included with its full issuer-qualified asset ID.
 
 ## Important limitations
 
-- Provider search endpoints are capped/indexer-dependent. Results do not prove
-  that every network, DEX or pool worldwide has been discovered.
+- Provider search endpoints are capped/indexer-dependent. StellarExpert scans at most 1,000 pools per request; results do not prove that every network, DEX or pool worldwide has been discovered.
 - The current implementation does **not** independently verify pools or reserves
   on-chain. `indexed_only` means precisely that; liquidity and volume are provider
   metrics, not chain-verified facts.

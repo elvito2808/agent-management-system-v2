@@ -7,6 +7,7 @@ from decimal import Decimal
 from agent_system.dex_research.global_service import research_token, render_markdown
 from agent_system.dex_research.stablecoin_resolver import classify_pool
 from agent_system.dex_research.stellar_expert_provider import StellarExpertProvider
+from agent_system.dex_research.global_providers import GeckoTerminalProvider
 
 
 class FakeProvider:

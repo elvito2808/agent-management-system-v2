@@ -72,7 +72,9 @@ Completed on `feature/dex-research-agent`:
 - Offline unit tests for API parsing/error cases and exact-address stablecoin filtering.
 - GitHub Actions workflow running the DEX research unit tests on pushes and pull requests.
 - High-level discovery service combining API fetching, exact-address stablecoin filtering, Netswap/Tethys allowlisting, and positive reported-liquidity filtering.
-- DEX research test workflow completed successfully on the current implementation.
+- Read-only Metis JSON-RPC verifier checks chain ID, deployed bytecode, and V2-compatible pool token0/token1 addresses against the discovered pair.
+- Orchestration function combines discovery with per-pool on-chain verification and preserves RPC errors per candidate.
+- DEX research test workflow completed successfully for the RPC verifier and discovery/service code.
 
 Still incomplete:
 - The dedicated DEX research test workflow passes. The repository-wide Core CI still fails in two installer tests (`test_doctor_detects_release_tampering_and_missing_db` and `test_install_then_doctor_and_existing_install_preserves_state`) because expected installed-release migration files are missing. These failures are outside the DEX research files and need a separate decision before merging.

@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from agent_system.dex_research.global_service import research_token, render_markdown
 from agent_system.dex_research.stablecoin_resolver import classify_pool
+from agent_system.dex_research.stellar_expert_provider import StellarExpertProvider
 
 
 class FakeProvider:
@@ -117,6 +118,55 @@ class GlobalResearchTests(unittest.TestCase):
     def test_empty_query_is_rejected(self):
         with self.assertRaises(ValueError):
             research_token("  ", providers=[])
+
+
+class StellarExpertProviderTests(unittest.TestCase):
+    def test_stellar_native_xlm_pool_and_stellar_usdc_identity_are_normalized(self):
+        payload = {
+            "_links": {"self": {"href": "/explorer/public/liquidity-pool?limit=2"}},
+            "_embedded": {"records": [{
+                "id": "pool-fixture-1",
+                "assets": ["XLM", "USDC-GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN-1"],
+                "total_value_locked_usd": "12345.67",
+                "volume_24h_usd": "456.78",
+                "paging_token": 1
+            }]}
+        }
+        provider = StellarExpertProvider(fetch_json=lambda _url: payload, max_pages=1, page_size=2)
+        report = research_token("XLM", providers=[provider])
+        self.assertEqual(report.status, "data_found")
+        self.assertEqual(len(report.pools), 1)
+        pool_result = report.pools[0]
+        self.assertEqual(pool_result.network, "stellar")
+        self.assertEqual(pool_result.token0.symbol, "XLM")
+        self.assertEqual(pool_result.token0.asset_id, "XLM")
+        self.assertEqual(pool_result.liquidity_usd, Decimal("12345.67"))
+        self.assertEqual(pool_result.volume_24h_usd, Decimal("456.78"))
+        self.assertEqual(pool_result.stablecoin_status, "matched_registry")
+        self.assertEqual(pool_result.stablecoin_symbol, "USDC")
+        self.assertEqual(pool_result.verification_status, "indexed_only")
+
+    def test_stellar_network_filter_does_not_leak_into_other_networks(self):
+        provider = StellarExpertProvider(fetch_json=lambda _url: self.fail("must not call provider"))
+        identities, pools = provider.search("XLM", network_filter="ethereum")
+        self.assertEqual(identities, [])
+        self.assertEqual(pools, [])
+
+    def test_stellar_page_cursor_is_bounded_and_progresses(self):
+        calls = []
+        def fake_fetch(url):
+            calls.append(url)
+            if len(calls) == 1:
+                return {"_links": {"next": {"href": "next"}},
+                        "_embedded": {"records": [{"id": "not-match", "assets": ["AAA-GAAA", "BBB-GBBB"], "paging_token": 100}]}}
+            return {"_embedded": {"records": [{"id": "match", "assets": ["XLM", "AAA-GAAA"], "paging_token": 200}]}}
+        provider = StellarExpertProvider(fetch_json=fake_fetch, max_pages=2, page_size=1)
+        identities, pools = provider.search("XLM")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("cursor=100", calls[1])
+        self.assertEqual(len(pools), 1)
+        self.assertEqual(pools[0]["pool_id"], "match")
+
 
 
 if __name__ == "__main__":

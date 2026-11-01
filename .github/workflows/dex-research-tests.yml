@@ -21,3 +21,16 @@ jobs:
         env:
           PYTHONPATH: src
         run: python -m unittest discover -s tests -p "test_dex_research*.py" -v
+
+      - name: Run live Metis DEX smoke test (read-only)
+        env:
+          PYTHONPATH: src
+        run: python scripts/metis_live_smoke.py
+      - name: Upload live Metis report artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metis-live-smoke-report
+          path: artifacts/metis-live-smoke-report.*
+          if-no-files-found: warn
+          retention-days: 14

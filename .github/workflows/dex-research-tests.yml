@@ -5,7 +5,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [feature/dex-research-agent]
+    branches: [feature/dex-research-agent, feature/global-multichain-dex-research]
 
 jobs:
   unit-tests:

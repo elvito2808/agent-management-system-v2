@@ -1,0 +1,33 @@
+name: Metis live DEX smoke test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/dex-research-agent]
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run read-only live Metis RPC and token-pool checks
+        env:
+          PYTHONPATH: src
+        run: python scripts/metis_live_smoke.py
+      - name: Upload JSON and Markdown reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: metis-live-smoke-report
+          path: artifacts/metis-live-smoke-report.*
+          if-no-files-found: warn
+          retention-days: 14

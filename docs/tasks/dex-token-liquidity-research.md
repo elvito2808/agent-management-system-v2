@@ -70,10 +70,12 @@ Completed on `feature/dex-research-agent`:
 - Sourced Metis Andromeda registry entries for canonical-bridge m.USDC and m.USDT, with the official Metis technical migration guide recorded as the source.
 - Registry loader with input validation.
 - Offline unit tests for API parsing/error cases and exact-address stablecoin filtering.
-- GitHub Actions workflow intended to run the DEX research unit tests on pushes and pull requests.
+- GitHub Actions workflow running the DEX research unit tests on pushes and pull requests.
+- High-level discovery service combining API fetching, exact-address stablecoin filtering, Netswap/Tethys allowlisting, and positive reported-liquidity filtering.
+- DEX research test workflow completed successfully on the current implementation.
 
 Still incomplete:
-- CI run has not yet been observed; confirm workflow execution and fix any failures before merging.
+- The dedicated DEX research test workflow passes. The repository-wide Core CI still fails in two installer tests (`test_doctor_detects_release_tampering_and_missing_db` and `test_install_then_doctor_and_existing_install_preserves_state`) because expected installed-release migration files are missing. These failures are outside the DEX research files and need a separate decision before merging.
 - No direct RPC/on-chain verification of pool/token contracts yet.
 - No verified Netswap/Tethys Router registry yet; do not infer Router addresses from pool data.
 - No token-symbol-to-contract discovery; callers must currently provide the token contract address.

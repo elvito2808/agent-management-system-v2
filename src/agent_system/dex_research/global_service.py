@@ -1,12 +1,14 @@
 """Orchestrate provider-driven, cross-network token and pool discovery."""
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Any, Iterable
 import re
 
 from .global_models import PoolCandidate, ProviderIssue, ResearchReport, TokenIdentity
 from .global_providers import DexScreenerProvider, GeckoTerminalProvider, PoolProvider
+from .stablecoin_resolver import classify_pool
 
 
 def _identity(raw: dict[str, Any]) -> TokenIdentity:
@@ -35,9 +37,7 @@ def _normal(value: str | None) -> str:
 
 def _query_matches_token(query: str, token: TokenIdentity) -> bool:
     needle = _normal(query)
-    if not needle:
-        return False
-    return needle in {_normal(token.name), _normal(token.symbol), _normal(token.asset_id)}
+    return bool(needle) and needle in {_normal(token.name), _normal(token.symbol), _normal(token.asset_id)}
 
 
 def research_token(
@@ -49,8 +49,8 @@ def research_token(
 ) -> ResearchReport:
     """Search multiple global providers; one provider failure never aborts the report.
 
-    The providers' search APIs may return a capped result set. Coverage is therefore
-    explicitly provider-supported rather than a claim of exhaustive global indexing.
+    Provider search APIs may cap result sets. Coverage is provider-supported, not
+    a claim of exhaustive global indexing. All operations are read-only.
     """
     requested = query.strip()
     if not requested:
@@ -78,25 +78,28 @@ def research_token(
                     pool = _pool(raw)
                     if network_filter and pool.network.casefold() != network_filter.casefold():
                         continue
-                    if address_filter and address_filter.casefold() not in {
-                        (pool.token0.asset_id or "").casefold(), (pool.token1.asset_id or "").casefold()
-                    }:
+                    token_addresses = {(pool.token0.asset_id or "").casefold(), (pool.token1.asset_id or "").casefold()}
+                    if address_filter and address_filter.casefold() not in token_addresses:
                         continue
-                    # Avoid showing irrelevant search matches if the provider's search is broad.
-                    if not ( _query_matches_token(requested, pool.token0)
-                             or _query_matches_token(requested, pool.token1)
-                             or (address_filter and address_filter.casefold() in {
-                                 (pool.token0.asset_id or "").casefold(), (pool.token1.asset_id or "").casefold()
-                             })):
+                    if not (_query_matches_token(requested, pool.token0)
+                            or _query_matches_token(requested, pool.token1)
+                            or (address_filter and address_filter.casefold() in token_addresses)):
                         continue
+                    status, stable_symbol, evidence_url = classify_pool(
+                        pool.network,
+                        {"asset_id": pool.token0.asset_id},
+                        {"asset_id": pool.token1.asset_id},
+                    )
+                    pool = replace(pool, stablecoin_status=status, stablecoin_symbol=stable_symbol,
+                                   stablecoin_evidence_url=evidence_url)
                     pools.setdefault(pool.key, pool)
-                except (TypeError, ValueError, KeyError):
-                    continue
+                except (TypeError, ValueError, KeyError, RuntimeError) as exc:
+                    issues.append(ProviderIssue(provider=provider.name, stage="normalize_pool",
+                                                message=f"{type(exc).__name__}: {exc}"))
+
         except Exception as exc:
             issues.append(ProviderIssue(provider=provider.name, stage="search", message=f"{type(exc).__name__}: {exc}"))
 
-    # A pool returned by more than one provider is represented once; retain provenance
-    # in source field when the duplicate source is encountered.
     status = "data_found" if pools else ("partial_data" if issues and identities else "insufficient_data")
     if issues and pools:
         status = "partial_data"
@@ -105,7 +108,8 @@ def research_token(
     notes = [
         "Pool and volume figures are third-party indexed metrics, not independently verified on-chain.",
         "Search endpoints may cap results; absence from these results is not proof that no pool exists.",
-        "Stablecoin classification remains unclassified until a network-specific asset identifier matches a reviewed registry entry.",
+        "Stablecoin status is matched only when both network alias and chain-specific asset identifier match the reviewed registry. Unmatched assets remain unclassified.",
+        "The bundled stablecoin registry is a seed list, not an exhaustive catalogue; extend it using sourced, reviewed chain-specific identifiers.",
         "DEX Screener and GeckoTerminal are the configured sources; networks unsupported or omitted by them are coverage gaps.",
     ]
     if not pools and issues:
@@ -113,7 +117,8 @@ def research_token(
     return ResearchReport(
         query=requested,
         generated_at_utc=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-        status=status, identities=sorted(identities.values(), key=lambda x: (x.network.casefold(), (x.symbol or "").casefold())),
+        status=status,
+        identities=sorted(identities.values(), key=lambda x: (x.network.casefold(), (x.symbol or "").casefold())),
         pools=sorted(pools.values(), key=lambda x: x.liquidity_usd or 0, reverse=True),
         providers_searched=searched, networks_found=networks, dexes_found=dexes,
         issues=issues, coverage_notes=notes,
@@ -141,10 +146,17 @@ def render_markdown(report: ResearchReport) -> str:
     if not report.pools:
         lines.append("No matching pool was returned by the providers searched.")
     else:
-        lines += ["| Network | DEX | Pair | Pool | Liquidity USD | 24h volume USD | Stablecoin status | Verification | Source |", "|---|---|---|---|---:|---:|---|---|---|"]
+        lines += ["| Network | DEX | Pair | Pool | Liquidity USD | 24h volume USD | Stablecoin match | Evidence | Verification | Source |",
+                  "|---|---|---|---|---:|---:|---|---|---|---|"]
         for p in report.pools:
             pair = f"{p.token0.symbol or p.token0.name or '?'} / {p.token1.symbol or p.token1.name or '?'}"
-            values = [p.network, p.dex_name, pair, p.pool_id or "unknown", str(p.liquidity_usd) if p.liquidity_usd is not None else "unknown", str(p.volume_24h_usd) if p.volume_24h_usd is not None else "unknown", p.stablecoin_status, p.verification_status, f"[{p.source}]({p.source_url})" if p.source_url else p.source]
+            stablecoin = p.stablecoin_symbol or p.stablecoin_status
+            evidence = f"[registry source]({p.stablecoin_evidence_url})" if p.stablecoin_evidence_url else "—"
+            values = [p.network, p.dex_name, pair, p.pool_id or "unknown",
+                      str(p.liquidity_usd) if p.liquidity_usd is not None else "unknown",
+                      str(p.volume_24h_usd) if p.volume_24h_usd is not None else "unknown",
+                      stablecoin, evidence, p.verification_status,
+                      f"[{p.source}]({p.source_url})" if p.source_url else p.source]
             lines.append("| " + " | ".join(str(v).replace("|", "\\|") for v in values) + " |")
             if p.pool_url:
                 lines.append(f"  - Pool page: {p.pool_url}")

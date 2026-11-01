@@ -16,4 +16,4 @@ ams = "agent_system.interfaces.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-agent_system = ["dex_research/data/*.json"]
+agent_system = ["dex_research/data/*.json", "infrastructure/database/migrations/*.py", "infrastructure/database/migrations/versions/*.py"]

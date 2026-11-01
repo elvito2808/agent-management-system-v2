@@ -21,7 +21,7 @@ jobs:
           PYTHONPATH: src
         run: |
           mkdir -p artifacts
-          python scripts/global_dex_research.py WZIL --format json --output artifacts/wzil-zilliqa-evm.json
+          python scripts/global_dex_research.py WZIL --network zilliqa-evm --format json --output artifacts/wzil-zilliqa-evm.json
       - name: Summarize WZIL results
         if: always()
         run: |
@@ -36,7 +36,7 @@ jobs:
           pools = report.get("pools", [])
           wzil = [
               p for p in pools
-              if p.get("network", "").casefold() in {"zilliqa-evm", "zilliqa"}
+              if p.get("network", "").casefold() == "zilliqa-evm"
               and any((t.get("symbol") or "").upper() == "WZIL" for t in (p.get("token0", {}), p.get("token1", {})))
           ]
           print(f"query={report.get('query')}; status={report.get('status')}; matching_pools={len(wzil)}")

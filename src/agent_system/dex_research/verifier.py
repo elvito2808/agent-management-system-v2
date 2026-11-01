@@ -188,3 +188,106 @@ def verify_v2_pool_onchain(
         errors=tuple(errors),
         rpc_url=rpc_url,
     )
+
+
+GET_PAIR_SELECTOR = "0xe6a43905"
+
+
+@dataclass(frozen=True)
+class FactoryPairVerification:
+    verified: bool
+    chain_id: int | None
+    factory_address: str
+    factory_has_code: bool
+    reported_pair_address: str | None
+    checks: tuple[str, ...]
+    errors: tuple[str, ...]
+    rpc_url: str
+
+
+def _abi_address_argument(address: str) -> str:
+    normalized = normalize_address(address)
+    if normalized is None or not normalized.startswith("0x"):
+        raise ValueError("Expected an EVM address")
+    digits = normalized[2:]
+    if len(digits) != 40 or any(ch not in "0123456789abcdef" for ch in digits):
+        raise ValueError("Expected a 20-byte EVM address")
+    return digits.rjust(64, "0")
+
+
+def verify_factory_pair(
+    pool: PoolCandidate,
+    factory_address: str,
+    *,
+    rpc_url: str = METIS_RPC_URL,
+    expected_chain_id: int = METIS_CHAIN_ID,
+    timeout_seconds: float = 12.0,
+    opener: Callable = urlopen,
+) -> FactoryPairVerification:
+    """Check that a DEX factory's getPair(token0, token1) returns this pool.
+
+    This verifies factory provenance for V2-compatible factories, but does not
+    independently verify router addresses or reserve balances.
+    """
+    if not rpc_url.startswith("https://"):
+        raise ValueError("rpc_url must use HTTPS")
+    if timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be positive")
+    factory = normalize_address(factory_address)
+    if factory is None:
+        raise ValueError("factory_address must not be empty")
+
+    chain_result = _rpc_call(
+        rpc_url, "eth_chainId", [], timeout_seconds=timeout_seconds, opener=opener
+    )
+    if not isinstance(chain_result, str) or not chain_result.startswith("0x"):
+        raise OnChainVerificationError("RPC returned invalid eth_chainId")
+    try:
+        actual_chain_id = int(chain_result, 16)
+    except ValueError as exc:
+        raise OnChainVerificationError("RPC returned invalid eth_chainId") from exc
+
+    checks: list[str] = []
+    errors: list[str] = []
+    if actual_chain_id != expected_chain_id or actual_chain_id != pool.chain_id:
+        errors.append(
+            f"chain_id_mismatch:rpc={actual_chain_id},expected={expected_chain_id},pool={pool.chain_id}"
+        )
+        return FactoryPairVerification(False, actual_chain_id, factory, False, None,
+                                       tuple(checks), tuple(errors), rpc_url)
+    checks.append(f"chain_id_matches:{actual_chain_id}")
+
+    factory_code = _has_code(
+        _rpc_call(rpc_url, "eth_getCode", [factory_address, "latest"],
+                  timeout_seconds=timeout_seconds, opener=opener),
+        "factory",
+    )
+    if not factory_code:
+        errors.append("factory_has_no_code")
+        return FactoryPairVerification(False, actual_chain_id, factory, False, None,
+                                       tuple(checks), tuple(errors), rpc_url)
+    checks.append("factory_has_bytecode")
+
+    calldata = GET_PAIR_SELECTOR + _abi_address_argument(pool.token0.address) + _abi_address_argument(pool.token1.address)
+    result = _rpc_call(
+        rpc_url, "eth_call", [{"to": factory_address, "data": calldata}, "latest"],
+        timeout_seconds=timeout_seconds, opener=opener,
+    )
+    if not isinstance(result, str) or not result.startswith("0x") or len(result) != 66:
+        raise OnChainVerificationError("Factory getPair returned an invalid ABI address")
+    pair_address = "0x" + result[-40:]
+    if normalize_address(pair_address) != normalize_address(pool.pool_address):
+        errors.append("factory_getPair_does_not_match_discovered_pool")
+    else:
+        checks.append("factory_getPair_matches_discovered_pool")
+
+    return FactoryPairVerification(
+        verified=not errors,
+        chain_id=actual_chain_id,
+        factory_address=factory,
+        factory_has_code=factory_code,
+        reported_pair_address=pair_address,
+        checks=tuple(checks),
+        errors=tuple(errors),
+        rpc_url=rpc_url,
+    )

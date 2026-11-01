@@ -74,11 +74,11 @@ def main() -> int:
 
     try:
         token_code = has_code(token_address)
-        live_checks.append({"check": "metis_token_predeploy_bytecode",
+        live_checks.append({"check": "token_contract_bytecode",
                             "address": token_address, "passed": token_code})
     except Exception as exc:
         token_code = False
-        live_checks.append({"check": "metis_token_predeploy_bytecode",
+        live_checks.append({"check": "token_contract_bytecode",
                             "address": token_address, "passed": False, "error": str(exc)})
 
     for deployment in deployments:

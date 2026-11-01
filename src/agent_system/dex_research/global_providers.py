@@ -124,7 +124,11 @@ class GeckoTerminalProvider:
             rels = row.get("relationships") if isinstance(row.get("relationships"), dict) else {}
             network_rel = rels.get("network") if isinstance(rels.get("network"), dict) else {}
             network_data = network_rel.get("data") if isinstance(network_rel.get("data"), dict) else {}
-            network = str(network_data.get("id") or attrs.get("network") or "unknown")
+            row_id = row.get("id") if isinstance(row.get("id"), str) else ""
+            # GeckoTerminal pool IDs are commonly "<network>_<pool-address>".
+            # Use that explicit namespace when relationship/attribute metadata is absent.
+            network_from_id = row_id.split("_", 1)[0] if "_" in row_id else None
+            network = str(network_data.get("id") or attrs.get("network") or network_from_id or "unknown")
             if network_filter and network.casefold() != network_filter.casefold():
                 continue
             def related_token(key: str) -> dict[str, Any] | None:

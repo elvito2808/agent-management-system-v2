@@ -2,117 +2,136 @@
 
 ## Product goal
 
-The agent must accept a token name or symbol (for example `ADA`, `TRX`, `LINK`, or a full token name) and autonomously discover the relevant networks, token identities, active DEXs, and stablecoin-paired pools. Metis Andromeda, Netswap, and Tethys are only one supported example, not the product boundary.
+Build a provider-driven research agent that accepts **any user-supplied token name or symbol**, not a fixed list of examples. Examples such as `X`, `Y`, `ADA`, `TRX`, or `LINK` illustrate the input format only and must not become an allowlist.
 
-The user should not need to supply a chain, DEX, stablecoin list, or contract address for ordinary symbol/name searches. A contract address and optional chain may be accepted as disambiguating inputs.
+The agent must discover where the requested asset identity has liquidity across networks and DEXs, then produce sourced reports of relevant pools. Metis Andromeda, Netswap, and Tethys are only an existing prototype and must not define the global product boundary.
 
-## Required end-to-end flow
+The ordinary input is a name or symbol. Users should not need to provide a chain, DEX, contract address, or stablecoin list. Optional address/network filters can be accepted to disambiguate results.
 
-1. **Resolve token identity**
-   - Search trusted token metadata and market-data sources by name/symbol.
-   - Return all plausible matches with chain, token type (native asset or contract token), contract/asset identifier, and source.
-   - Never treat a ticker as globally unique.
-   - If a name/symbol has multiple plausible matches and there is no safe way to identify the intended asset, report the ambiguity clearly; do not silently choose one.
-   - Handle non-EVM identifiers and native assets. ADA on Cardano and TRX on Tron are not equivalent to ordinary EVM contract-address inputs. Wrapped or bridged versions on other chains must be represented as separate identities and labelled accordingly.
+## Required user journey and research order
 
-2. **Discover networks and DEXs**
-   - Search global market-data/indexer sources for candidate pools and chain deployments.
-   - Use provider adapters so additional data sources can be added without rewriting the report logic.
-   - Maintain a sourced, updateable chain/DEX registry as a fallback and for protocol-specific metadata. The registry must not be a hardcoded allowlist that limits the agent to one chain.
-   - Include all discovered networks and DEXs supported by reliable sources; disclose provider coverage limitations rather than implying exhaustive global coverage when sources are incomplete.
+### 1. Resolve the requested name or symbol
 
-3. **Discover stablecoin pairs**
-   - Identify stablecoins by chain-specific asset/contract identifiers, not ticker text alone.
-   - Support network-specific stablecoin representations and distinguish canonical, bridged, and wrapped variants when reliable metadata is available.
-   - Discover candidate pools for each resolved token identity, then retain pools paired with recognized stablecoins.
-   - Do not require every chain's stablecoin registry to be manually populated before a search can run. Use provider metadata and sourced registries together, and mark unclassified assets as unknown rather than guessing that they are stablecoins.
+- Search trusted token metadata and market-data sources for the requested string.
+- Return plausible identities with name, symbol, network, token type (native asset or contract token), address/asset identifier, and source.
+- A symbol is not a globally unique identifier. Never silently choose between different assets with the same symbol.
+- If ambiguity cannot be resolved safely, show the candidates and mark the result as ambiguous rather than fabricating a single identity.
+- Support native assets and non-EVM identifiers. For example, native ADA on Cardano and native TRX on Tron must not be treated as ordinary EVM contract tokens.
+- Distinguish native assets, wrapped assets, and bridged representations. The same ticker on multiple chains does not by itself prove the assets are identical.
 
-4. **Collect pool and DEX details**
-   For each pool, collect when available:
-   - network name and chain ID / network identifier;
-   - token name, symbol, and native-asset identifier or contract address for both sides;
-   - stablecoin identity and why it was classified as a stablecoin;
-   - DEX and pool/pair identifier or contract address;
-   - reported USD liquidity and 24-hour volume;
-   - pool URL and block explorer URL;
-   - factory/router addresses and source links when applicable;
-   - provider/source URLs, UTC fetch time, and data freshness.
+### 2. Discover every source-supported network and DEX with liquidity
 
-5. **Verify without overstating certainty**
-   - Use chain-specific read-only verification adapters where supported: EVM JSON-RPC, Cardano-compatible data sources, Tron-compatible APIs/RPC, and future adapters as needed.
-   - Verify pool identity, token identities, factory relationships, and bytecode/reserves only when the chain and pool type support those checks.
-   - Clearly separate third-party indexed metrics from on-chain verification. A successful pool-address check does not independently prove an indexer's USD liquidity or 24-hour volume is correct.
-   - Never invent token, pool, factory, or router addresses. Unknown values remain unknown.
-   - Do not require every verification to succeed before producing the report.
+- For each resolved token identity, query global market-data/indexer sources and discover candidate pools across **all networks returned by those sources**, not just the token's origin/issuance network.
+- A token issued on one network may also have wrapped, bridged, or otherwise represented versions on other networks. Search these other networks too, while labelling the precise identity found on each network.
+- Example output rows could include `Pair X/USDT on BSC`, `Pair X/USDT on Ethereum`, `Pair X/USDT on Polygon`, and `Pair X/USDT on Solana` if supported sources actually return those pools. These are illustrative examples, not claims that such pools exist for every token.
+- For every discovered network, list the DEX name, pair/pool, both assets, liquidity, volume, and source. Do not restrict the DEX list to a hardcoded allowlist.
+- Use pluggable provider adapters so data sources can be added or replaced without rewriting the core orchestrator.
+- Maintain sourced, updateable chain/DEX metadata for protocol details and verification, but do not require manual registration of every DEX before the discovery layer can find it.
+- Disclose the providers and networks searched and any known coverage gaps. Do not claim absolute exhaustive global coverage unless the available sources genuinely establish it.
 
-6. **Partial results are first-class**
-   - A timeout, unavailable RPC, unavailable DEX, unsupported pool type, missing metric, or provider error must not abort the entire token report.
-   - Record the affected token identity, network, DEX or pool and the missing data, with a status such as `data_found`, `partial_data`, `insufficient_data`, `unsupported_verification`, or `ambiguous_identity`.
-   - Continue with other discovered networks and DEXs.
-   - Do not interpret an API failure or lack of indexed results as proof that no pool exists.
+### 3. Identify stablecoin pairs by real asset identity
+
+- Identify stablecoins by chain-specific contract address or native-asset identifier and reliable metadata, not by ticker text alone.
+- Support chain-specific variants such as canonical, bridged, and wrapped stablecoins; keep variants separate when their identities differ.
+- Discover pools for each resolved token identity and keep pairs that match recognized stablecoins.
+- Combine provider metadata with sourced chain-specific registries. Do not require every chain's registry to be manually populated before searches can run.
+- If a quote asset cannot be classified confidently, mark it as unknown/unclassified instead of guessing it is a stablecoin.
+
+### 4. Collect pool details and perform network-appropriate verification
+
+For every discovered pool, collect as available:
+- network name and chain/network identifier;
+- token names, symbols, and contract or native-asset identifiers for both sides;
+- stablecoin identity and evidence for its classification;
+- DEX name and pool/pair identifier or contract address;
+- reported USD liquidity and 24-hour volume;
+- pool page and block-explorer URL;
+- factory/router addresses and source links when applicable;
+- source URLs, UTC retrieval time, and freshness indicators.
+
+Use read-only verification adapters appropriate to the chain and pool type:
+- EVM: JSON-RPC and applicable contract/factory/token/reserve checks;
+- Cardano: Cardano-compatible asset and pool data interfaces;
+- Tron: Tron-compatible APIs/RPC;
+- other chains: appropriate adapters added incrementally.
+
+Do not apply EVM address or JSON-RPC assumptions to non-EVM networks. Clearly distinguish third-party indexed liquidity/volume from facts verified on-chain; verifying a pool address does not by itself verify an indexer's USD liquidity or 24-hour volume.
+
+Never invent token, pool, factory, router, or asset identifiers. Unknown values remain unknown.
+
+### 5. Preserve partial results when a source fails
+
+- A timeout, unavailable RPC, DEX, provider, unsupported pool type, or missing metric must not abort the whole token report.
+- Record the affected identity, network, DEX or pool, missing field, source, and error where useful.
+- Use explicit statuses such as `data_found`, `partial_data`, `insufficient_data`, `unsupported_verification`, and `ambiguous_identity`.
+- Continue with all other discovered identities, networks, DEXs, and providers.
+- Do not interpret an API failure or absence from one indexer as proof that no pool exists.
 
 ## Report output
 
 Generate Markdown and JSON reports with:
-- the requested name/symbol and report timestamp;
-- token identity matches and any ambiguity;
-- a coverage summary of data providers, networks, and DEXs checked;
-- discovered stablecoin pools grouped by network and DEX;
-- liquidity and volume values with source and timestamp;
-- contract/pool/factory/router details and explorer links where known;
-- verification status and exact limitations for every incomplete section;
-- explicit distinction between “no matching pool found in searched sources” and “could not determine because data was unavailable.”
+- requested query and report timestamp;
+- candidate token identities and ambiguity notes;
+- a coverage summary listing providers, networks, and DEXs actually searched;
+- stablecoin pools grouped by network and DEX;
+- each pair's two assets, pool address/identifier, reported liquidity, 24-hour volume, source, and timestamp;
+- factory/router details and explorer links when known;
+- verification state and explicit limitations for every incomplete section;
+- a clear distinction between “no matching pool found in the sources searched” and “could not determine because data was unavailable.”
 
 ## Architecture requirements
 
-Keep the system modular:
+Keep the system modular and network-agnostic:
 - `token_resolver`: name/symbol to candidate token identities;
-- `provider_adapters`: market-data, token metadata, pool discovery, and DEX metadata sources;
-- `chain_registry`: chain identifiers, explorers, RPC/data capabilities, and native-asset identifiers;
+- `provider_adapters`: global market-data, token metadata, pool discovery, and DEX metadata providers;
+- `chain_registry`: chain identifiers, explorers, capabilities, and native-asset identifiers;
 - `dex_registry`: sourced DEX deployments and pool/factory/router capabilities per chain;
 - `stablecoin_resolver`: chain-specific stablecoin identities and evidence;
 - `chain_adapters`: optional chain-specific read-only verification;
-- `research_orchestrator`: fans out across identities, chains, and DEXs while isolating per-source failures;
-- `report`: common JSON/Markdown output independent of any single network.
+- `research_orchestrator`: fans out across token identities, networks, DEXs, and providers while isolating errors;
+- `report`: shared JSON/Markdown output independent of a single network.
 
-The current Metis implementation should be refactored into one chain/DEX adapter rather than treated as the global orchestrator.
+The current Metis implementation should become one adapter within this architecture, not the global orchestrator.
 
 ## Implementation plan
 
-### Phase A — Global discovery and token resolution
-- Define common schemas for token identities, chain identifiers, DEXs, pools, provider provenance, and per-source errors.
-- Implement symbol/name resolution and expose ambiguous matches.
-- Implement at least one global pool-discovery provider adapter and a second independent source where feasible.
-- Make the workflow accept a token name/symbol, with optional chain/address filters.
-- Add offline tests for duplicate symbols, native assets, bridged/wrapped identities, provider failures, and partial reports.
+### Phase A — Generic identity resolution and global pool discovery
+1. Define shared models for token identity, network, DEX, pool, source provenance, and per-source errors without assuming all chains use integer EVM chain IDs or 20-byte addresses.
+2. Implement token name/symbol resolution with multiple candidates and ambiguity handling.
+3. Implement a global pool-discovery provider adapter that can return pairs across networks and DEXs; add a second independent provider where feasible.
+4. Make the workflow accept any free-form token name/symbol, with optional network/address filters.
+5. Test duplicate symbols, native assets, wrapped/bridged assets, unknown network identifiers, provider failures, and partial reports offline.
 
-### Phase B — Multi-chain stablecoin and DEX discovery
-- Add chain-specific stablecoin classification and sourced metadata.
-- Discover pools across every network returned by the configured providers, not only a fixed list of DEX IDs.
-- Add coverage reporting and safeguards against duplicate pools from multiple providers.
+### Phase B — Multi-network stablecoin classification and DEX metadata
+1. Add stablecoin classification using chain-specific identifiers and evidence.
+2. Discover pools across every network/DEX returned by configured providers rather than a fixed DEX list.
+3. Add provenance, coverage reporting, and deduplication across providers.
 
 ### Phase C — Chain-specific verification
-- Add independent verification adapters incrementally by chain and pool type.
-- Start with EVM networks, then add non-EVM networks such as Cardano and Tron using suitable data interfaces.
-- Keep verification capability explicit per chain/pool type; do not apply EVM address/RPC assumptions to non-EVM chains.
+1. Add verification adapters incrementally by network and pool type.
+2. Support EVM networks first where practical, then non-EVM networks such as Cardano and Tron through appropriate data interfaces.
+3. State which checks are supported per chain and pool type.
 
-### Phase D — Operational hardening
-- Add scheduled registry refreshes and provider health/coverage reporting.
-- Test partial failure paths and ensure any single network/provider failure leaves the rest of the report available.
-- Publish JSON and Markdown workflow artifacts.
+### Phase D — Reliability and operations
+1. Add scheduled metadata refreshes and provider-health/coverage reporting.
+2. Test that any one provider/network failure leaves the rest of the report available.
+3. Publish JSON and Markdown report artifacts from the workflow.
 
 ## Acceptance criteria
 
-- A user can submit only `ADA` or `TRX` and receive a report that resolves candidate identities and searches all networks/DEXs discoverable through configured sources.
+- Any user-supplied name or symbol can be searched; examples in this document are not an allowlist.
+- The user can enter a symbol alone and the agent resolves plausible identities before searching.
+- Results include source-supported pools across networks other than the asset's original network, including wrapped/bridged representations when discovered and labelled accurately.
+- For each network, results list DEX names and relevant stablecoin pairs with liquidity data when available.
 - The workflow is not restricted to Metis, Netswap, or Tethys.
-- Token identity is chain-aware and does not rely on symbol matching alone.
-- Pools are filtered by chain-specific stablecoin identity, not merely by symbol.
-- Provider and RPC errors are isolated; the report contains useful partial results and says exactly what could not be completed.
-- No unsupported claim of exhaustive global coverage is made: sources and coverage gaps are disclosed.
+- Stablecoin matching uses chain-specific asset identities and evidence, not ticker-only matching.
+- EVM and non-EVM assets are represented and verified using suitable chain-specific methods.
+- Provider and RPC errors are isolated and reported; other research continues.
+- Sources and coverage gaps are disclosed; the agent never claims unproven global completeness.
 - Unknown addresses, metrics, routers, and verification results are never fabricated.
-- Reports distinguish indexed market metrics from independently verified on-chain facts.
-- The workflow is read-only and never requests private keys or submits transactions.
+- Indexed market metrics are distinguished from independently verified on-chain facts.
+- The system is read-only and never requests private keys or submits transactions.
 
 ## Current status
 
-The existing implementation is a Metis-specific prototype. Its Metis/Netswap/Tethys configuration and workflow do not yet satisfy the global multi-chain requirements above. The next implementation work must establish token resolution and provider-driven multi-chain discovery before describing the project as globally capable.
+The existing implementation is a Metis-specific prototype. The new branch `feature/global-multichain-dex-research` is the development branch for this global scope. The implementation work must start with Phase A—generic identity resolution and global pool discovery—before the project can claim multi-chain support.

@@ -1,0 +1,98 @@
+[
+  {
+    "network_aliases": ["ethereum", "eth"],
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "asset_id": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "source_url": "https://etherscan.io/token/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["ethereum", "eth"],
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "asset_id": "0xdac17f958d2ee523a2206206994597c13d831ec7",
+    "source_url": "https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["ethereum", "eth"],
+    "symbol": "DAI",
+    "name": "Dai Stablecoin",
+    "asset_id": "0x6b175474e89094c44da98b954eedeac495271d0f",
+    "source_url": "https://etherscan.io/token/0x6b175474e89094c44da98b954eedeac495271d0f",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["base"],
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "asset_id": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "source_url": "https://basescan.org/token/0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["polygon", "polygon_pos"],
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "asset_id": "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+    "source_url": "https://polygonscan.com/token/0x3c499c542cef5e3811e1192ce70d8cc03d5c3359",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["polygon", "polygon_pos"],
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "asset_id": "0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+    "source_url": "https://polygonscan.com/token/0xc2132d05d31c914a87c6611c10748aeb04b58e8f",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["arbitrum", "arbitrum_one"],
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "asset_id": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+    "source_url": "https://arbiscan.io/token/0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["arbitrum", "arbitrum_one"],
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "asset_id": "0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+    "source_url": "https://arbiscan.io/token/0xfd086bc7cd5c481dcc9c85ebe478a1c0b69fcbb9",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["optimism"],
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "asset_id": "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+    "source_url": "https://optimistic.etherscan.io/token/0x0b2c639c533813f4aa9d7837caf62653d097ff85",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["optimism"],
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "asset_id": "0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+    "source_url": "https://optimistic.etherscan.io/token/0x94b008aa00579c1307b0ef2c499ad98a8ce58e58",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["bsc", "binance-smart-chain"],
+    "symbol": "USDT",
+    "name": "Tether USD",
+    "asset_id": "0x55d398326f99059ff775485246999027b3197955",
+    "source_url": "https://bscscan.com/token/0x55d398326f99059ff775485246999027b3197955",
+    "reviewed": "2026-11-01"
+  },
+  {
+    "network_aliases": ["bsc", "binance-smart-chain"],
+    "symbol": "USDC",
+    "name": "USD Coin",
+    "asset_id": "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
+    "source_url": "https://bscscan.com/token/0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d",
+    "reviewed": "2026-11-01"
+  }
+]

@@ -41,7 +41,7 @@ class ReportTests(unittest.TestCase):
 
     def test_markdown_marks_unknown_metrics_and_router(self):
         report = render_markdown_report([self.result], self.deployments)
-        self.assertIn("| unknown | unknown | not verified | unknown |", report)
+        self.assertIn("| 1234.50 | unknown | not verified | unknown |", report)
         self.assertIn("Missing metrics are shown as unknown, not zero.", report)
 
 

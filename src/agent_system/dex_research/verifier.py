@@ -291,3 +291,86 @@ def verify_factory_pair(
         errors=tuple(errors),
         rpc_url=rpc_url,
     )
+
+
+ROUTER_FACTORY_SELECTOR = "0xc45a0155"
+
+
+@dataclass(frozen=True)
+class RouterFactoryVerification:
+    verified: bool
+    chain_id: int | None
+    router_address: str
+    router_has_code: bool
+    reported_factory_address: str | None
+    checks: tuple[str, ...]
+    errors: tuple[str, ...]
+    rpc_url: str
+
+
+def verify_router_factory_onchain(
+    router_address: str,
+    expected_factory_address: str,
+    *,
+    rpc_url: str = METIS_RPC_URL,
+    expected_chain_id: int = METIS_CHAIN_ID,
+    timeout_seconds: float = 12.0,
+    opener: Callable = urlopen,
+) -> RouterFactoryVerification:
+    """Verify router bytecode and that router.factory() matches the registry."""
+    if not rpc_url.startswith("https://"):
+        raise ValueError("rpc_url must use HTTPS")
+    if timeout_seconds <= 0:
+        raise ValueError("timeout_seconds must be positive")
+    router = normalize_address(router_address)
+    factory = normalize_address(expected_factory_address)
+    if router is None or factory is None:
+        raise ValueError("router and expected factory addresses must not be empty")
+
+    chain_result = _rpc_call(
+        rpc_url, "eth_chainId", [], timeout_seconds=timeout_seconds, opener=opener
+    )
+    if not isinstance(chain_result, str) or not chain_result.startswith("0x"):
+        raise OnChainVerificationError("RPC returned invalid eth_chainId")
+    try:
+        actual_chain_id = int(chain_result, 16)
+    except ValueError as exc:
+        raise OnChainVerificationError("RPC returned invalid eth_chainId") from exc
+    checks: list[str] = []
+    errors: list[str] = []
+    if actual_chain_id != expected_chain_id:
+        errors.append(f"chain_id_mismatch:rpc={actual_chain_id},expected={expected_chain_id}")
+        return RouterFactoryVerification(False, actual_chain_id, router, False, None,
+                                         tuple(checks), tuple(errors), rpc_url)
+    checks.append(f"chain_id_matches:{actual_chain_id}")
+
+    code = _has_code(
+        _rpc_call(rpc_url, "eth_getCode", [router_address, "latest"],
+                  timeout_seconds=timeout_seconds, opener=opener),
+        "router",
+    )
+    if not code:
+        errors.append("router_has_no_code")
+        return RouterFactoryVerification(False, actual_chain_id, router, False, None,
+                                         tuple(checks), tuple(errors), rpc_url)
+    checks.append("router_has_bytecode")
+
+    result = _rpc_call(
+        rpc_url, "eth_call", [{"to": router_address, "data": ROUTER_FACTORY_SELECTOR}, "latest"],
+        timeout_seconds=timeout_seconds, opener=opener,
+    )
+    reported = _address_from_call(result, "factory")
+    if normalize_address(reported) != factory:
+        errors.append("router_factory_does_not_match_registry")
+    else:
+        checks.append("router_factory_matches_registry")
+    return RouterFactoryVerification(
+        verified=not errors,
+        chain_id=actual_chain_id,
+        router_address=router,
+        router_has_code=code,
+        reported_factory_address=reported,
+        checks=tuple(checks),
+        errors=tuple(errors),
+        rpc_url=rpc_url,
+    )

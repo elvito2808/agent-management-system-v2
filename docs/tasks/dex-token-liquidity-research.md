@@ -73,12 +73,17 @@ Completed on `feature/dex-research-agent`:
 - GitHub Actions workflow running the DEX research unit tests on pushes and pull requests.
 - High-level discovery service combining API fetching, exact-address stablecoin filtering, Netswap/Tethys allowlisting, and positive reported-liquidity filtering.
 - Read-only Metis JSON-RPC verifier checks chain ID, deployed bytecode, and V2-compatible pool token0/token1 addresses against the discovered pair.
+- Sourced DEX deployment registry: Netswap factory/router are documented in the protocol's exchange-contracts repository; Tethys factory is listed in a historical security audit report. Tethys router remains unknown and is deliberately null.
+- Factory verifier checks whether a V2-compatible factory's getPair(token0, token1) matches the discovered pool address.
+- Router verifier checks bytecode and router.factory() against the sourced factory address when a router address is known.
+- JSON and Markdown report renderers include sources, UTC freshness, reported metrics, explorer links, and verification status; unknown metrics/routers remain explicit.
 - Orchestration function combines discovery with per-pool on-chain verification and preserves RPC errors per candidate.
-- DEX research test workflow completed successfully for the RPC verifier and discovery/service code.
 
 Still incomplete:
-- The dedicated DEX research test workflow passes. The repository-wide Core CI still fails in two installer tests (`test_doctor_detects_release_tampering_and_missing_db` and `test_install_then_doctor_and_existing_install_preserves_state`) because expected installed-release migration files are missing. These failures are outside the DEX research files and need a separate decision before merging.
-- No direct RPC/on-chain verification of pool/token contracts yet.
-- No verified Netswap/Tethys Router registry yet; do not infer Router addresses from pool data.
+- The dedicated DEX research test workflow has passed on recent commits; confirm the latest run after report and router-verifier changes before merging.
+- These RPC checks are implemented and mock-tested but have not been run against live mainnet RPC in this workflow.
+- Netswap router is sourced from protocol repository and explorer constructor metadata; the router is not yet confirmed by a live RPC call in this workflow.
+- Tethys factory is sourced from a historical audit report; verify live bytecode and getPair behavior before production use. Tethys router remains unknown and must not be guessed.
+- Repository-wide Core CI has failed in two installer tests (`test_doctor_detects_release_tampering_and_missing_db` and `test_install_then_doctor_and_existing_install_preserves_state`) because expected installed-release migration files are missing; recheck latest Core CI and handle separately before merging.
 - No token-symbol-to-contract discovery; callers must currently provide the token contract address.
 - Registry is intentionally limited to canonical-bridge m.USDC and m.USDT, not all assets marketed as stablecoins on Metis.

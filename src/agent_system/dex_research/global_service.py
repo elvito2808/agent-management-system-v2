@@ -70,9 +70,11 @@ def research_token(
             for raw in raw_identities:
                 try:
                     identity = _identity(raw)
-                    if ((not network_filter or identity.network.casefold() == network_filter.casefold())
-                            and (_query_matches_token(requested, identity)
-                                 or (address_filter and address_filter.casefold() == (identity.asset_id or "").casefold()))):
+                    identity_matches = (
+                        address_filter.casefold() == (identity.asset_id or "").casefold()
+                        if address_filter else _query_matches_token(requested, identity)
+                    )
+                    if (not network_filter or identity.network.casefold() == network_filter.casefold()) and identity_matches:
                         identities.setdefault(identity.key, identity)
                 except (TypeError, ValueError, KeyError):
                     continue
@@ -89,7 +91,11 @@ def research_token(
                     if not (matches0 or matches1):
                         continue
                     for candidate in (pool.token0, pool.token1):
-                        if _query_matches_token(requested, candidate) or (address_filter and address_filter.casefold() == (candidate.asset_id or "").casefold()):
+                        candidate_matches = (
+                            address_filter.casefold() == (candidate.asset_id or "").casefold()
+                            if address_filter else _query_matches_token(requested, candidate)
+                        )
+                        if candidate_matches:
                             identities.setdefault(candidate.key, candidate)
                     status, stable_symbol, evidence_url = classify_pool(
                         pool.network,

@@ -2,6 +2,8 @@ name: Metis live DEX smoke test
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [main]
   push:
     branches: [feature/dex-research-agent]
 

@@ -108,7 +108,7 @@ class GeckoTerminalProvider:
     base_url = "https://api.geckoterminal.com/api/v2/search/pools"
 
     def search(self, query: str, *, network_filter: str | None = None, address_filter: str | None = None) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        url = f"{self.base_url}?query={quote(query, safe='')}&page=1"
+        url = f"{self.base_url}?query={quote(query, safe='')}&page=1&include=base_token,quote_token,dex,network"
         payload = _http_json(url)
         if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
             raise RuntimeError("GeckoTerminal returned an unexpected response shape")

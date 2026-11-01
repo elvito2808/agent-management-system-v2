@@ -14,7 +14,7 @@ from agent_system.dex_research.verifier import (
     verify_factory_pair, verify_router_factory_onchain,
 )
 
-METIS_TOKEN_ADDRESS = "0xDeadDeAddeAddEAddeadDEaDDEaDDeaDDeaD0000"
+METIS_TOKEN_ADDRESS = "0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000"
 EXPECTED_CHAIN_ID = 1088
 ARTIFACT_DIR = Path("artifacts")
 TIMEOUT_SECONDS = 15.0

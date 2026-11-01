@@ -78,7 +78,7 @@ def main() -> int:
         live_checks.append({"check": "token_contract_bytecode",
                             "address": token_address, "passed": token_code})
     except Exception as exc:
-        token_code = False
+        token_code = None
         live_checks.append({"check": "token_contract_bytecode",
                             "address": token_address, "passed": None, "error": str(exc)})
 
